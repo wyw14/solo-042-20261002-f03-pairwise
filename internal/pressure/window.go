@@ -44,10 +44,14 @@ func (w *Window) Add(sample model.Sample) bool {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.epoch == 0 {
+	switch {
+	case w.epoch == 0:
 		w.epoch = sample.CalibrationEpoch
-	}
-	if sample.CalibrationEpoch != w.epoch {
+	case sample.CalibrationEpoch < w.epoch:
+		// A stale, pre-calibration sample must never replace current data.
+		return false
+	case sample.CalibrationEpoch > w.epoch:
+		// A newer calibration generation starts a fresh window.
 		w.epoch = sample.CalibrationEpoch
 		w.samples = nil
 	}

@@ -116,9 +116,14 @@ func buildRuntime(cfg config, now func() time.Time) (*runtime, error) {
 			return nil, err
 		}
 	}
-	calibrations := probe.NewCalibrationService(probeRegistry, now)
+	calibrations := probe.NewCalibrationService(probeRegistry, pressureMonitor, now)
 	if err := calibrations.Subscribe(func(notice probe.CalibrationNotice) {
-		_ = pressureMonitor.Reset(notice.VesselID, notice.NewEpoch)
+		slog.Info("probe calibrated",
+			"probe", notice.ProbeID,
+			"vessel", notice.VesselID,
+			"operator", notice.Operator,
+			"old_epoch", notice.OldEpoch,
+			"new_epoch", notice.NewEpoch)
 	}); err != nil {
 		return nil, err
 	}
@@ -199,6 +204,7 @@ func buildRuntime(cfg config, now func() time.Time) (*runtime, error) {
 		Alarms:         alarmService,
 		Probes:         probeRegistry,
 		ProbeLifecycle: probeLifecycle,
+		Calibrations:   calibrations,
 		Transfers:      transferService,
 		Telemetry:      ingestor,
 		Receiver:       receiver,
