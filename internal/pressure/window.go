@@ -38,16 +38,21 @@ func (w *Window) Reset(epoch uint64) {
 	w.samples = nil
 }
 
-func (w *Window) Add(sample model.Sample) bool {
+// Add applies a pressure sample to the window. Samples from a calibration
+// older than the window epoch are rejected with ErrStaleEpoch so they can
+// never influence a soak decision; samples from a newer epoch clear the
+// window before accumulating.
+func (w *Window) Add(sample model.Sample) error {
 	if sample.Kind != model.ProbePressure || sample.VesselID != w.vesselID {
-		return false
+		return errors.New("sample does not belong to pressure window")
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.epoch == 0 {
 		w.epoch = sample.CalibrationEpoch
-	}
-	if sample.CalibrationEpoch != w.epoch {
+	} else if sample.CalibrationEpoch < w.epoch {
+		return ErrStaleEpoch
+	} else if sample.CalibrationEpoch > w.epoch {
 		w.epoch = sample.CalibrationEpoch
 		w.samples = nil
 	}
@@ -59,7 +64,7 @@ func (w *Window) Add(sample model.Sample) bool {
 	if len(w.samples) > w.capacity {
 		w.samples = w.samples[len(w.samples)-w.capacity:]
 	}
-	return true
+	return nil
 }
 
 func (w *Window) Stable() bool {

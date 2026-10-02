@@ -8,6 +8,8 @@ import (
 	"github.com/wyw14/cry-98/internal/model"
 )
 
+var ErrStaleEpoch = errors.New("pressure sample belongs to an obsolete calibration epoch")
+
 type Result struct {
 	VesselID  string    `json:"vessel_id"`
 	Epoch     uint64    `json:"epoch"`
@@ -58,10 +60,18 @@ func (m *Monitor) Add(sample model.Sample) error {
 	if window == nil {
 		return errors.New("pressure window not found")
 	}
-	if !window.Add(sample) {
-		return errors.New("sample was rejected by pressure window")
+	if err := window.Add(sample); err != nil {
+		return err
 	}
 	return nil
+}
+
+// HasVessel reports whether a pressure window exists for the vessel.
+func (m *Monitor) HasVessel(vesselID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.windows[vesselID]
+	return ok
 }
 
 func (m *Monitor) Evaluate(vesselID string) (Result, error) {

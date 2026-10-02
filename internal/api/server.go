@@ -20,6 +20,7 @@ type Dependencies struct {
 	Alarms         *alarm.Service
 	Probes         *probe.Registry
 	ProbeLifecycle *probe.Lifecycle
+	Calibrations   *probe.CalibrationService
 	Transfers      *transfer.Service
 	Telemetry      *telemetry.Ingestor
 	Receiver       *telemetry.Receiver
@@ -69,6 +70,10 @@ func (s *Server) routes() chi.Router {
 		api.Get("/probes", s.listProbes)
 		api.Post("/probes/{id}/samples", s.publishProbeSample)
 		api.Post("/probes/{id}/rebind", s.rebindProbe)
+		api.Post("/probes/{id}/calibrations", s.createCalibration)
+		api.Get("/probes/{id}/calibrations", s.listCalibrations)
+		api.Post("/calibrations/{calibrationID}/execute", s.executeCalibration)
+		api.Get("/calibrations/{calibrationID}", s.getCalibration)
 	})
 	return router
 }

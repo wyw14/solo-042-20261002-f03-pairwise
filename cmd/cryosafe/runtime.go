@@ -117,8 +117,16 @@ func buildRuntime(cfg config, now func() time.Time) (*runtime, error) {
 		}
 	}
 	calibrations := probe.NewCalibrationService(probeRegistry, now)
-	if err := calibrations.Subscribe(func(notice probe.CalibrationNotice) {
-		_ = pressureMonitor.Reset(notice.VesselID, notice.NewEpoch)
+	if err := calibrations.AddEpochSink(func(notice probe.CalibrationNotice) error {
+		// Only pressure probes feed the soak window; calibrating a level or
+		// temperature probe must not invalidate the pressure epoch.
+		if notice.Kind != model.ProbePressure {
+			return nil
+		}
+		if !pressureMonitor.HasVessel(notice.VesselID) {
+			return errors.New("pressure window not found for calibrated probe")
+		}
+		return pressureMonitor.Reset(notice.VesselID, notice.NewEpoch)
 	}); err != nil {
 		return nil, err
 	}
@@ -199,6 +207,7 @@ func buildRuntime(cfg config, now func() time.Time) (*runtime, error) {
 		Alarms:         alarmService,
 		Probes:         probeRegistry,
 		ProbeLifecycle: probeLifecycle,
+		Calibrations:   calibrations,
 		Transfers:      transferService,
 		Telemetry:      ingestor,
 		Receiver:       receiver,
